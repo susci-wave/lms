@@ -192,9 +192,10 @@ namespace lms::ui
 
         bool moreResults{};
         db::Track::find(LmsApp->getDbSession(), params, moreResults, [this](const db::Track::pointer& track) {
-            _container->add(TrackListHelpers::createEntry(track, _playQueueController, _filters));
+            std::optional<db::TrackListId> trackListId = _trackListId;
+            _container->add(TrackListHelpers::createEntry(track, _playQueueController, _filters, trackListId));
         });
-
+        
         _container->setHasMore(moreResults);
     }
 } // namespace lms::ui

@@ -24,6 +24,7 @@
 #include <Wt/WPushButton.h>
 
 #include "av/IAudioFile.hpp"
+#include "core/ILogger.hpp"
 #include "core/Service.hpp"
 #include "database/Session.hpp"
 #include "database/Types.hpp"
@@ -31,6 +32,7 @@
 #include "database/objects/Release.hpp"
 #include "database/objects/Track.hpp"
 #include "database/objects/TrackArtistLink.hpp"
+#include "database/objects/TrackList.hpp"
 #include "database/objects/TrackLyrics.hpp"
 #include "database/objects/User.hpp"
 #include "services/feedback/IFeedbackService.hpp"
@@ -210,7 +212,7 @@ namespace lms::ui::TrackListHelpers
         LmsApp->getModalManager().show(std::move(trackLyrics));
     }
 
-    std::unique_ptr<Wt::WWidget> createEntry(const db::ObjectPtr<db::Track>& track, PlayQueueController& playQueueController, Filters& filters)
+    std::unique_ptr<Wt::WWidget> createEntry(const db::ObjectPtr<db::Track>& track, PlayQueueController& playQueueController, Filters& filters, std::optional<db::TrackListId>& trackListId)
     {
         auto entry{ std::make_unique<Template>(Wt::WString::tr("Lms.Explore.Tracks.template.entry")) };
         auto* entryPtr{ entry.get() };
@@ -305,6 +307,78 @@ namespace lms::ui::TrackListHelpers
 
         entry->bindNew<Wt::WPushButton>("download", Wt::WString::tr("Lms.Explore.download"))
             ->setLink(Wt::WLink{ std::make_unique<DownloadTrackResource>(trackId) });
+
+        entry->setCondition("if-has-trackid", trackListId.has_value());
+        Wt::WPushButton* delBtn{ entry->bindNew<Wt::WPushButton>("delete", Wt::WString::tr("Lms.delete")) };
+        delBtn->clicked().connect([trackId, trackListId, entryPtr] {
+            if (trackListId.has_value()) {
+                LMS_LOG(UI, INFO, "Delete button clicked for track " << trackId.toString() << " from track list " << trackListId->toString());
+            } else {
+                LMS_LOG(UI, INFO, "Delete button clicked for track " << trackId.toString() << " (no track list specified)");
+            }
+             
+            auto modal{ std::make_unique<Wt::WTemplate>(Wt::WString::tr("Lms.Explore.TrackList.template.delete-tracklist")) };
+            modal->addFunction("tr", &Wt::WTemplate::Functions::tr);
+            Wt::WWidget* modalPtr{ modal.get() };
+
+            auto* delBtn2{ modal->bindNew<Wt::WPushButton>("del-btn", Wt::WString::tr("Lms.delete")) };
+            delBtn2->clicked().connect([trackId, trackListId, modalPtr, entryPtr] {
+                if (trackListId.has_value()) {
+                    LMS_LOG(UI, INFO, "Delete button confirmed for track " << trackId.toString() << " from track list " << trackListId->toString());
+                    
+                    // 实际删除逻辑
+                    auto transaction{ LmsApp->getDbSession().createWriteTransaction() };
+                    
+                    try {
+                        // 查找并删除 TrackListEntry
+                        std::vector<db::TrackListEntry::pointer> entriesToDelete;
+                        db::TrackListEntry::find(LmsApp->getDbSession(), 
+                            db::TrackListEntry::FindParameters{}.setTrackList(*trackListId),
+                            [trackId, &entriesToDelete](const db::TrackListEntry::pointer& entry) {
+                                if (entry->getTrackId() == trackId) {
+                                    entriesToDelete.push_back(entry);
+                                }
+                            });
+                        
+                        LMS_LOG(UI, INFO, "Found " << entriesToDelete.size() << " entries to delete for track " << trackId.toString());
+                        
+                        for (auto& entry : entriesToDelete) {
+                            LMS_LOG(UI, INFO, "Deleting TrackListEntry with ID " << entry->getId().toString());
+                            entry.remove();
+                        }
+                        
+                        if (!entriesToDelete.empty()) {
+                            // 更新 TrackList 的最后修改时间
+                            auto trackList{ db::TrackList::find(LmsApp->getDbSession(), *trackListId) };
+                            if (trackList) {
+                                trackList.modify()->setLastModifiedDateTime(Wt::WDateTime::currentDateTime());
+                                LMS_LOG(UI, INFO, "Updated last modified time for track list " << trackListId->toString());
+                            }
+                            
+                            // 标识数据已被删除 - 从UI中移除该条目
+                            LMS_LOG(UI, INFO, "Removing track entry from UI for track " << trackId.toString());
+                            entryPtr->removeFromParent();
+                        }
+                        
+                        LMS_LOG(UI, INFO, "Successfully deleted track " << trackId.toString() << " from track list " << trackListId->toString());
+                    } catch (const std::exception& e) {
+                        LMS_LOG(UI, ERROR, "Failed to delete track " << trackId.toString() << " from track list: " << e.what());
+                    }
+                } else {
+                    LMS_LOG(UI, INFO, "Delete button confirmed for track " << trackId.toString() << " (no track list specified - operation not supported)");
+                }
+            
+                LmsApp->getModalManager().dispose(modalPtr);
+            });
+
+            auto* cancelBtn{ modal->bindNew<Wt::WPushButton>("cancel-btn", Wt::WString::tr("Lms.cancel")) };
+            cancelBtn->clicked().connect([=] {
+                LmsApp->getModalManager().dispose(modalPtr);
+            });
+
+            LmsApp->getModalManager().show(std::move(modal));
+
+        });
 
         entry->bindNew<Wt::WPushButton>("track-info", Wt::WString::tr("Lms.Explore.track-info"))
             ->clicked()

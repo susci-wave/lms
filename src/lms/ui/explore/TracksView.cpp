@@ -121,8 +121,10 @@ namespace lms::ui
 
         for (const db::TrackId trackId : trackIds.results)
         {
-            if (const db::Track::pointer track{ db::Track::find(LmsApp->getDbSession(), trackId) })
-                _container->add(TrackListHelpers::createEntry(track, _playQueueController, _filters));
+            if (const db::Track::pointer track{ db::Track::find(LmsApp->getDbSession(), trackId) }){
+                std::optional<db::TrackListId> _x_trackListId = std::nullopt;
+                _container->add(TrackListHelpers::createEntry(track, _playQueueController, _filters, _x_trackListId));
+            }
         }
 
         _container->setHasMore(trackIds.moreResults);
