@@ -20,6 +20,8 @@
 #include "TrackListView.hpp"
 
 #include <Wt/WPushButton.h>
+#include <Wt/WStackedWidget.h>
+#include <Wt/WTemplateFormView.h>
 
 #include "core/String.hpp"
 #include "database/Session.hpp"
