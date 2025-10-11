@@ -248,27 +248,41 @@ namespace lms::ui
  
         auto* saveBtn{ modal->bindNew<Wt::WPushButton>("save-btn", Wt::WString::tr("Lms.save")) };
         saveBtn->clicked().connect([=, this] {
+            bool success{};
             renameTrackList->updateModel(renameTrackListModel.get());
             if (renameTrackListModel->validate())
             {
-                Session& session{ LmsApp->getDbSession() };
-                auto transaction{ session.createWriteTransaction() };
-                TrackList::pointer trackList{ TrackList::find(LmsApp->getDbSession(), _trackListId) };
-                if (trackList) {
-                    trackList.modify()->setName(renameTrackListModel->getName());
-                    // Update the name directly in the UI without full refresh
-                    bindString("name", std::string{ renameTrackListModel->getName() }, Wt::TextFormat::Plain);
-                }
-
-                // Track::find(session, params, [&](const Track::pointer& track) {
-                //     session.create<TrackListEntry>(track, trackList);
-                // });
-                // exportToNewTrackList(renameTrackListModel->getName());
-                renameTrackList->updateView(renameTrackListModel.get());
-                LmsApp->getModalManager().dispose(modalPtr);
+                doRenameTrackList(renameTrackListModel->getName());
+                success = true;
             }
+            renameTrackList->updateView(renameTrackListModel.get());
+            if (success)
+                LmsApp->getModalManager().dispose(modalPtr);
         });
 
         LmsApp->getModalManager().show(std::move(modal));
     }
+
+    void PlayQueue::doRenameTrackList(const Wt::WString& name)
+    {
+        using namespace db;
+
+
+        {
+            Session& session{ LmsApp->getDbSession() };
+            auto transaction{ session.createWriteTransaction() };
+            TrackList::pointer trackList{ TrackList::find(LmsApp->getDbSession(), _trackListId) };
+            if (trackList) {
+                trackList.modify()->setName(renameTrackListModel->getName());
+                bindString("name", std::string{ renameTrackListModel->getName() }, Wt::TextFormat::Plain);
+            }
+
+            // Track::find(session, params, [&](const Track::pointer& track) {
+            //     session.create<TrackListEntry>(track, trackList);
+            // });
+
+        }
+
+    }
+    
 } // namespace lms::ui
