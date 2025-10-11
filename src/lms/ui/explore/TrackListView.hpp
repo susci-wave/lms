@@ -39,6 +39,7 @@ namespace lms::ui
     private:
         void refreshView();
         void addSome();
+        void renameTrackList();  // 添加重命名函数声明
 
         static constexpr std::size_t _batchSize{ 6 };
         static constexpr std::size_t _maxCount{ 8000 };
