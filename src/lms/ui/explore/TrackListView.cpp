@@ -273,8 +273,8 @@ namespace lms::ui
             auto transaction{ session.createWriteTransaction() };
             TrackList::pointer trackList{ TrackList::find(LmsApp->getDbSession(), _trackListId) };
             if (trackList) {
-                trackList.modify()->setName(renameTrackListModel->getName());
-                bindString("name", std::string{ renameTrackListModel->getName() }, Wt::TextFormat::Plain);
+                trackList.modify()->setName(std::string(name));
+                bindString("name", std::string{ name }, Wt::TextFormat::Plain);
             }
 
             // Track::find(session, params, [&](const Track::pointer& track) {
