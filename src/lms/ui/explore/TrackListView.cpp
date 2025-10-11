@@ -22,6 +22,8 @@
 #include <Wt/WPushButton.h>
 #include <Wt/WStackedWidget.h>
 #include <Wt/WTemplateFormView.h>
+#include <Wt/WLineEdit.h>
+#include <Wt/WFormModel.h>
 
 #include "core/String.hpp"
 #include "database/Session.hpp"
