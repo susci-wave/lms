@@ -9,6 +9,7 @@
 <message id="Lms.clusters">Etiquetas</message>
 <message id="Lms.create">Crear</message>
 <message id="Lms.delete">Eliminar</message>
+<message id="Lms.rename">Renombrar</message>
 <message id="Lms.discard">Descartar</message>
 <message id="Lms.edit">Editar</message>
 <message id="Lms.field-must-be-in-upper-case">Este campo debe estar en mayúsculas</message>

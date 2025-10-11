@@ -37,6 +37,8 @@
 #include "explore/PlayQueueController.hpp"
 #include "explore/TrackListHelpers.hpp"
 #include "resource/DownloadResource.hpp"
+#include "common/MandatoryValidator.hpp"
+#include "common/ValueStringModel.hpp"
 
 namespace lms::ui
 {
@@ -46,6 +48,19 @@ namespace lms::ui
         {
             return core::stringUtils::readAs<db::TrackListId::ValueType>(wApp->internalPathNextPart("/tracklist/"));
         }
+        class RenameTrackListModel : public Wt::WFormModel
+        {
+        public:
+            static inline const Field NameField{ "name" };
+
+            RenameTrackListModel()
+            {
+                addField(NameField);
+                setValidator(NameField, createMandatoryValidator());
+            }
+
+            Wt::WString getName() const { return valueText(NameField); }
+        };
     } // namespace
 
     TrackList::TrackList(Filters& filters, PlayQueueController& playQueueController)
@@ -98,6 +113,11 @@ namespace lms::ui
         bindString("duration", utils::durationToString(trackList->getDuration()));
         const auto trackCount{ trackList->getCount() };
         bindString("track-count", Wt::WString::trn("Lms.track-count", trackCount).arg(trackCount));
+
+        Wt::WPushButton* saveBtn{ bindNew<Wt::WPushButton>("rename", Wt::WString::tr("Lms.rename"), Wt::TextFormat::Plain) };
+        saveBtn->clicked().connect([this] {
+            renameTrackList();
+        });
 
         Wt::WContainerWidget* clusterContainers{ bindNew<Wt::WContainerWidget>("clusters") };
         {
@@ -197,5 +217,53 @@ namespace lms::ui
         });
         
         _container->setHasMore(moreResults);
+    }
+
+    
+    void TrackList::renameTrackList()
+    {
+        
+        auto modal{ std::make_unique<Template>(Wt::WString::tr("Lms.Explore.TrackList.template.rename-tracklist")) };
+        modal->addFunction("id", &Wt::WTemplate::Functions::id);
+        modal->addFunction("tr", &Wt::WTemplate::Functions::tr);
+        Wt::WWidget* modalPtr{ modal.get() };
+
+        auto* cancelBtn{ modal->bindNew<Wt::WPushButton>("cancel-btn", Wt::WString::tr("Lms.cancel")) };
+        cancelBtn->clicked().connect([=] {
+            LmsApp->getModalManager().dispose(modalPtr);
+        });
+
+        Wt::WStackedWidget* contentStack{ modal->bindNew<Wt::WStackedWidget>("contents") };
+ 
+        // Rename TrackList
+        Wt::WTemplateFormView* renameTrackList{ contentStack->addNew<Wt::WTemplateFormView>(Wt::WString::tr("Lms.Explore.TrackList.template.rename-tracklist.save")) };
+        auto renameTrackListModel{ std::make_shared<RenameTrackListModel>() };
+        renameTrackList->setFormWidget(RenameTrackListModel::NameField, std::make_unique<Wt::WLineEdit>());
+        renameTrackList->updateView(renameTrackListModel.get());
+ 
+        auto* saveBtn{ modal->bindNew<Wt::WPushButton>("save-btn", Wt::WString::tr("Lms.save")) };
+        saveBtn->clicked().connect([=, this] {
+            renameTrackList->updateModel(renameTrackListModel.get());
+            if (renameTrackListModel->validate())
+            {
+                Session& session{ LmsApp->getDbSession() };
+                auto transaction{ session.createWriteTransaction() };
+                TrackList::pointer trackList{ TrackList::find(LmsApp->getDbSession(), _trackListId) };
+                if (trackList) {
+                    trackList.modify()->setName(renameTrackListModel->getName());
+                    // Update the name directly in the UI without full refresh
+                    bindString("name", std::string{ renameTrackListModel->getName() }, Wt::TextFormat::Plain);
+                }
+
+                // Track::find(session, params, [&](const Track::pointer& track) {
+                //     session.create<TrackListEntry>(track, trackList);
+                // });
+                // exportToNewTrackList(renameTrackListModel->getName());
+                renameTrackList->updateView(renameTrackListModel.get());
+                LmsApp->getModalManager().dispose(modalPtr);
+            }
+        });
+
+        LmsApp->getModalManager().show(std::move(modal));
     }
 } // namespace lms::ui
