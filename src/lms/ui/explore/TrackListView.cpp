@@ -263,7 +263,7 @@ namespace lms::ui
         LmsApp->getModalManager().show(std::move(modal));
     }
 
-    void PlayQueue::doRenameTrackList(const Wt::WString& name)
+    void TrackList::doRenameTrackList(const Wt::WString& name)
     {
         using namespace db;
 
