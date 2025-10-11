@@ -46,10 +46,6 @@ namespace lms::ui
 {
     namespace
     {
-        std::optional<db::TrackListId> extractTrackListIdFromInternalPath()
-        {
-            return core::stringUtils::readAs<db::TrackListId::ValueType>(wApp->internalPathNextPart("/tracklist/"));
-        }
         class RenameTrackListModel : public Wt::WFormModel
         {
         public:
@@ -63,6 +59,11 @@ namespace lms::ui
 
             Wt::WString getName() const { return valueText(NameField); }
         };
+        
+        std::optional<db::TrackListId> extractTrackListIdFromInternalPath()
+        {
+            return core::stringUtils::readAs<db::TrackListId::ValueType>(wApp->internalPathNextPart("/tracklist/"));
+        }
     } // namespace
 
     TrackList::TrackList(Filters& filters, PlayQueueController& playQueueController)
