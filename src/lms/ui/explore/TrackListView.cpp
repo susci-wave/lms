@@ -265,20 +265,17 @@ namespace lms::ui
 
     void TrackList::doRenameTrackList(const Wt::WString& name)
     {
-        using namespace db;
-
-
         {
-            Session& session{ LmsApp->getDbSession() };
+            auto& session{ LmsApp->getDbSession() };
             auto transaction{ session.createWriteTransaction() };
-            TrackList::pointer trackList{ TrackList::find(LmsApp->getDbSession(), _trackListId) };
+            db::TrackList::pointer trackList{ db::TrackList::find(LmsApp->getDbSession(), _trackListId) };
             if (trackList) {
                 trackList.modify()->setName(std::string(name));
                 bindString("name", std::string{ name }, Wt::TextFormat::Plain);
             }
 
-            // Track::find(session, params, [&](const Track::pointer& track) {
-            //     session.create<TrackListEntry>(track, trackList);
+            // db::Track::find(session, params, [&](const db::Track::pointer& track) {
+            //     session.create<db::TrackListEntry>(track, trackList);
             // });
 
         }
