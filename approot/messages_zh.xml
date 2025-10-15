@@ -9,6 +9,7 @@
 <message id="Lms.clusters">标签</message>
 <message id="Lms.create">新建</message>
 <message id="Lms.delete">删除</message>
+<message id="Lms.add-to-playlist">添加到播放列表</message>
 <message id="Lms.rename">重命名</message>
 <message id="Lms.discard">撤销</message>
 <message id="Lms.edit">编辑</message>

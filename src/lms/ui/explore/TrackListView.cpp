@@ -273,11 +273,6 @@ namespace lms::ui
                 trackList.modify()->setName(name.toUTF8());
                 bindString("name", std::string{ name.toUTF8() }, Wt::TextFormat::Plain);
             }
-
-            // db::Track::find(session, params, [&](const db::Track::pointer& track) {
-            //     session.create<db::TrackListEntry>(track, trackList);
-            // });
-
         }
 
     }

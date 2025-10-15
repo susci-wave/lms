@@ -379,6 +379,11 @@ namespace lms::ui::TrackListHelpers
             LmsApp->getModalManager().show(std::move(modal));
 
         });
+        
+        Wt::WPushButton* addToTrackListBtn{ entry->bindNew<Wt::WPushButton>("add-to-tracklist", Wt::WString::tr("Lms.add-to-tracklist")) };
+        addToTrackListBtn->clicked().connect([trackId] {
+            showAddToTrackListModal(trackId);
+        });
 
         entry->bindNew<Wt::WPushButton>("track-info", Wt::WString::tr("Lms.Explore.track-info"))
             ->clicked()
@@ -406,4 +411,81 @@ namespace lms::ui::TrackListHelpers
         return entry;
     }
 
+    void showAddToTrackListModal(db::TrackId trackId)
+    {
+        auto modal{ std::make_unique<Wt::WTemplate>(Wt::WString::tr("Lms.Explore.Tracks.template.add-to-tracklist")) };
+        modal->addFunction("tr", &Wt::WTemplate::Functions::tr);
+        
+        // 创建模型用于选择播放列表
+        auto trackListModel{ std::make_shared<Wt::WStringListModel>() };
+        
+        // 获取用户播放列表
+        {
+            auto transaction { LmsApp->getDbSession().createReadTransaction() };
+            
+            db::TrackList::FindParameters params;
+            params.setLibrary(LmsApp->getUserLibraryId());
+            params.setTypes({db::TrackListType::PlayList});
+            
+            db::TrackList::find(LmsApp->getDbSession(), params, [&](const db::TrackList::pointer& trackList) {
+                trackListModel->addString(Wt::WString::fromUTF8(trackList->getName()));
+                trackListModel->setData(trackListModel->rowCount()-1, 0, trackList->getId().toString(), Wt::ItemDataRole::User);
+            });
+        }
+
+        auto* cancelBtn{ modal->bindNew<Wt::WPushButton>("cancel-btn", Wt::WString::tr("Lms.cancel")) };
+        cancelBtn->clicked().connect([modalPtr = modal.get()] {
+            LmsApp->getModalManager().dispose(modalPtr);
+        });
+        
+        // 内容栈
+        Wt::WStackedWidget* contentStack{ modal->bindNew<Wt::WStackedWidget>("contents") };
+        
+        // 保存到播放列表的表单
+        Wt::WTemplateFormView* saveToTrackList{ contentStack->addNew<Wt::WTemplateFormView>(Wt::WString::tr("Lms.Explore.Tracks.template.add-to-tracklist.save")) };
+        
+        // 下拉选择播放列表
+        auto name{ std::make_unique<Wt::WComboBox>() };
+        name->setModel(trackListModel);
+        saveToTrackList->setFormWidget("name", std::move(name));
+        
+        auto* saveBtn{ modal->bindNew<Wt::WPushButton>("save-btn", Wt::WString::tr("Lms.save")) };
+        saveBtn->clicked().connect([=, modalPtr = modal.get()] {
+            // 获取下拉框的当前值
+            Wt::WComboBox* comboBox = saveToTrackList->formWidget("name")->as<Wt::WComboBox>();
+            int currentIndex = comboBox->currentIndex();
+            if (currentIndex >= 0) {
+                std::string trackListIdStr = trackListModel->data(currentIndex, 0, Wt::ItemDataRole::User).toString();
+                db::TrackListId trackListId{db::String{trackListIdStr}};
+                
+                addToTrackList(trackId, trackListId);
+                LmsApp->getModalManager().dispose(modalPtr);
+            }
+        });
+
+        LmsApp->getModalManager().show(std::move(modal));
+    }
+
+    void addToTrackList(db::TrackId trackId, db::TrackListId trackListId)
+    {
+        // 创建数据库事务
+        auto transaction{ LmsApp->getDbSession().createWriteTransaction() };
+        
+        // 查找播放列表
+        db::TrackList::pointer trackList{ db::TrackList::find(LmsApp->getDbSession(), trackListId) };
+        if (!trackList) {
+            LMS_LOG(UI, ERROR, "Failed to find track list " << trackListId.toString());
+            return;
+        }
+        
+        // 查找歌曲
+        db::Track::pointer track{ db::Track::find(LmsApp->getDbSession(), trackId) };
+        if (!track) {
+            LMS_LOG(UI, ERROR, "Failed to find track " << trackId.toString() << " to add to track list " << trackListId.toString());
+            return;
+        }
+        
+        // 创建播放列表条目
+        LmsApp->getDbSession().create<db::TrackListEntry>(track, trackList);
+    }
 } // namespace lms::ui::TrackListHelpers
