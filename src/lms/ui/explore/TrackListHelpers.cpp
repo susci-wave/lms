@@ -424,8 +424,8 @@ namespace lms::ui::TrackListHelpers
             auto transaction { LmsApp->getDbSession().createReadTransaction() };
             
             db::TrackList::FindParameters params;
-            params.setLibrary(LmsApp->getUserLibraryId());
-            params.setTypes({db::TrackListType::PlayList});
+            params.setUser(LmsApp->getUserId());
+            params.setType(db::TrackListType::PlayList);
             
             db::TrackList::find(LmsApp->getDbSession(), params, [&](const db::TrackList::pointer& trackList) {
                 trackListModel->addString(Wt::WString::fromUTF8(trackList->getName()));
