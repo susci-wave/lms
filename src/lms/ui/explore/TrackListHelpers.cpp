@@ -49,6 +49,50 @@
 
 namespace lms::ui::TrackListHelpers
 {
+    namespace {
+        
+        class AddToTrackListModel : public Wt::WFormModel
+        {
+        public:
+            static inline const Field NameField{ "name" };
+            using TrackListModel = ValueStringModel<db::TrackListId>;
+
+            AddToTrackListModel()
+            {
+                addField(NameField);
+                setValidator(NameField, createMandatoryValidator());
+            }
+
+            db::TrackListId getTrackListId() const
+            {
+                auto row{ trackListModel->getRowFromString(valueText(NameField)) };
+                return trackListModel->getValue(*row);
+            }
+
+            static std::shared_ptr<TrackListModel> createTrackListModel()
+            {
+                using namespace db;
+
+                auto model{ std::make_shared<TrackListModel>() };
+
+                auto transaction{ LmsApp->getDbSession().createReadTransaction() };
+
+                TrackList::FindParameters params;
+                params.setType(TrackListType::PlayList);
+                params.setUser(LmsApp->getUserId());
+                params.setSortMethod(TrackListSortMethod::Name);
+
+                TrackList::find(LmsApp->getDbSession(), params, [&](const TrackList::pointer& trackList) {
+                    model->add(Wt::WString::fromUTF8(std::string{ trackList->getName() }), trackList->getId());
+                });
+
+                return model;
+            }
+
+            std::shared_ptr<TrackListModel> trackListModel{ createTrackListModel() };
+        };
+    } // namespace
+
     std::map<Wt::WString, std::set<db::ArtistId>> getArtistsByRole(db::TrackId trackId, core::EnumSet<db::TrackArtistLinkType> artistLinkTypes)
     {
         std::map<Wt::WString, std::set<db::ArtistId>> artistMap;
@@ -414,53 +458,40 @@ namespace lms::ui::TrackListHelpers
     void showAddToTrackListModal(db::TrackId trackId)
     {
         auto modal{ std::make_unique<Wt::WTemplate>(Wt::WString::tr("Lms.Explore.Tracks.template.add-to-tracklist")) };
+        modal->addFunction("id", &Wt::WTemplate::Functions::id);
         modal->addFunction("tr", &Wt::WTemplate::Functions::tr);
-        
-        // 创建模型用于选择播放列表
-        auto trackListModel{ std::make_shared<Wt::WStringListModel>() };
-        
-        // 获取用户播放列表
-        {
-            auto transaction { LmsApp->getDbSession().createReadTransaction() };
-            
-            db::TrackList::FindParameters params;
-            params.setUser(LmsApp->getUserId());
-            params.setType(db::TrackListType::PlayList);
-            
-            db::TrackList::find(LmsApp->getDbSession(), params, [&](const db::TrackList::pointer& trackList) {
-                trackListModel->addString(Wt::WString::fromUTF8(trackList->getName()));
-                trackListModel->setData(trackListModel->rowCount()-1, 0, trackList->getId().toString(), Wt::ItemDataRole::User);
-            });
-        }
+        Wt::WWidget* modalPtr{ modal.get() };
 
         auto* cancelBtn{ modal->bindNew<Wt::WPushButton>("cancel-btn", Wt::WString::tr("Lms.cancel")) };
-        cancelBtn->clicked().connect([modalPtr = modal.get()] {
+        cancelBtn->clicked().connect([=] {
             LmsApp->getModalManager().dispose(modalPtr);
         });
-        
-        // 内容栈
+
         Wt::WStackedWidget* contentStack{ modal->bindNew<Wt::WStackedWidget>("contents") };
         
-        // 保存到播放列表的表单
-        Wt::WTemplateFormView* saveToTrackList{ contentStack->addNew<Wt::WTemplateFormView>(Wt::WString::tr("Lms.Explore.Tracks.template.add-to-tracklist.save")) };
-        
-        // 下拉选择播放列表
-        auto name{ std::make_unique<Wt::WComboBox>() };
-        name->setModel(trackListModel);
-        saveToTrackList->setFormWidget("name", std::move(name));
-        
+        // Replace TrackList
+        Wt::WTemplateFormView* replaceTrackList{ contentStack->addNew<Wt::WTemplateFormView>(Wt::WString::tr("Lms.PlayQueue.template.save-as-tracklist.replace-tracklist")) };
+        auto replaceTrackListModel{ std::make_shared<AddToTrackListModel>() };
+        {
+            auto name{ std::make_unique<Wt::WComboBox>() };
+            name->setModel(replaceTrackListModel->trackListModel);
+            replaceTrackList->setFormWidget(AddToTrackListModel::NameField, std::move(name));
+        }
+        replaceTrackList->updateView(replaceTrackListModel.get());
+ 
         auto* saveBtn{ modal->bindNew<Wt::WPushButton>("save-btn", Wt::WString::tr("Lms.save")) };
         saveBtn->clicked().connect([=, modalPtr = modal.get()] {
-            // 获取下拉框的当前值
-            Wt::WComboBox* comboBox = saveToTrackList->formWidget("name")->as<Wt::WComboBox>();
-            int currentIndex = comboBox->currentIndex();
-            if (currentIndex >= 0) {
-                std::string trackListIdStr = trackListModel->data(currentIndex, 0, Wt::ItemDataRole::User).toString();
-                db::TrackListId trackListId{db::String{trackListIdStr}};
-                
-                addToTrackList(trackId, trackListId);
+                bool success{};
+                replaceTrackList->updateModel(replaceTrackListModel.get());
+                if (replaceTrackListModel->validate())
+                {
+                    addToTrackList(trackId, replaceTrackListModel->getTrackListId());
+                    success = true;
+                }
+                replaceTrackList->updateView(replaceTrackListModel.get());
+
+            if (success)
                 LmsApp->getModalManager().dispose(modalPtr);
-            }
         });
 
         LmsApp->getModalManager().show(std::move(modal));
