@@ -349,7 +349,7 @@ namespace lms::db
 
         return utils::fetchQuerySingleResult(session.getDboSession()->find<TrackListEntry>().where("id = ?").bind(id));
     } 
-    std::size_t isTrackInList(Session& session, TrackId _track, TrackListId _trackList)
+    std::size_t TrackListEntry::isTrackInList(Session& session, TrackId _track, TrackListId _trackList)
     {
         session.checkReadTransaction();
 
