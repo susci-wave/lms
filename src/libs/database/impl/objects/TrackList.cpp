@@ -363,4 +363,16 @@ namespace lms::db
         utils::forEachQueryRangeResult(query, params.range, func);
     }
 
+    static std::size_t isTrackInList(Session& session, TrackId _track, TrackListId _trackList)
+    {
+        session.checkReadTransaction();
+
+        auto query{ session.getDboSession()->query<Wt::Dbo::ptr<TrackListEntry>>(
+            "SELECT COUNT(*) FROM tracklist_entry t_l_e WHERE t_l_e.tracklist_id = ? AND t_l_e.track_id = ?")
+            .bind(_trackList)
+            .bind(_track)
+        };
+        std::size_t cnt = utils::fetchQuerySingleResult(query);
+        return cnt == 0 ? 0 : 1;
+    }
 } // namespace lms::db

@@ -522,6 +522,13 @@ namespace lms::ui::TrackListHelpers
             return;
         }
         
+        // 判断是否已存在相同歌曲条目
+        std::size_t trackExists{ db::TrackListEntry::isTrackInList(LmsApp->getDbSession(), trackId, trackListId) };
+        if( trackExists == 1){
+            LMS_LOG(UI, ERROR, "Track " << trackId.toString() << " already exists in track list " << trackListId.toString());
+            return;
+        }
+        
         // 创建播放列表条目
         LmsApp->getDbSession().create<db::TrackListEntry>(track, trackList);
     }
