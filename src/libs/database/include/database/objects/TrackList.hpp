@@ -208,8 +208,9 @@ namespace lms::db
         };
         static pointer getById(Session& session, TrackListEntryId id);
         static void find(Session& session, const FindParameters& params, const std::function<void(const TrackListEntry::pointer&)>& func);
+        static std::size_t isTrackInList(Session& session, TrackId _track, TrackListId _trackList);
 
-        // Accessors
+    // Accessors
         TrackId getTrackId() const { return _track.id(); }
         ObjectPtr<Track> getTrack() const { return _track; }
         const Wt::WDateTime& getDateTime() const { return _dateTime; }

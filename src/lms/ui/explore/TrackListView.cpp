@@ -20,6 +20,10 @@
 #include "TrackListView.hpp"
 
 #include <Wt/WPushButton.h>
+#include <Wt/WStackedWidget.h>
+#include <Wt/WTemplateFormView.h>
+#include <Wt/WLineEdit.h>
+#include <Wt/WFormModel.h>
 
 #include "core/String.hpp"
 #include "database/Session.hpp"
@@ -37,11 +41,27 @@
 #include "explore/PlayQueueController.hpp"
 #include "explore/TrackListHelpers.hpp"
 #include "resource/DownloadResource.hpp"
+#include "common/MandatoryValidator.hpp"
+#include "common/ValueStringModel.hpp"
 
 namespace lms::ui
 {
     namespace
     {
+        class RenameTrackListModel : public Wt::WFormModel
+        {
+        public:
+            static inline const Field NameField{ "name" };
+
+            RenameTrackListModel()
+            {
+                addField(NameField);
+                setValidator(NameField, createMandatoryValidator());
+            }
+
+            Wt::WString getName() const { return valueText(NameField); }
+        };
+        
         std::optional<db::TrackListId> extractTrackListIdFromInternalPath()
         {
             return core::stringUtils::readAs<db::TrackListId::ValueType>(wApp->internalPathNextPart("/tracklist/"));
@@ -98,6 +118,11 @@ namespace lms::ui
         bindString("duration", utils::durationToString(trackList->getDuration()));
         const auto trackCount{ trackList->getCount() };
         bindString("track-count", Wt::WString::trn("Lms.track-count", trackCount).arg(trackCount));
+
+        Wt::WPushButton* saveBtn{ bindNew<Wt::WPushButton>("rename", Wt::WString::tr("Lms.rename"), Wt::TextFormat::Plain) };
+        saveBtn->clicked().connect([this] {
+            renameTrackList();
+        });
 
         Wt::WContainerWidget* clusterContainers{ bindNew<Wt::WContainerWidget>("clusters") };
         {
@@ -198,4 +223,58 @@ namespace lms::ui
         
         _container->setHasMore(moreResults);
     }
+
+    
+    void TrackList::renameTrackList()
+    {
+        
+        auto modal{ std::make_unique<Template>(Wt::WString::tr("Lms.Explore.TrackList.template.rename-tracklist")) };
+        modal->addFunction("id", &Wt::WTemplate::Functions::id);
+        modal->addFunction("tr", &Wt::WTemplate::Functions::tr);
+        Wt::WWidget* modalPtr{ modal.get() };
+
+        auto* cancelBtn{ modal->bindNew<Wt::WPushButton>("cancel-btn", Wt::WString::tr("Lms.cancel")) };
+        cancelBtn->clicked().connect([=] {
+            LmsApp->getModalManager().dispose(modalPtr);
+        });
+
+        Wt::WStackedWidget* contentStack{ modal->bindNew<Wt::WStackedWidget>("contents") };
+ 
+        // Rename TrackList
+        Wt::WTemplateFormView* renameTrackList{ contentStack->addNew<Wt::WTemplateFormView>(Wt::WString::tr("Lms.Explore.TrackList.template.rename-tracklist.save")) };
+        auto renameTrackListModel{ std::make_shared<RenameTrackListModel>() };
+        renameTrackList->setFormWidget(RenameTrackListModel::NameField, std::make_unique<Wt::WLineEdit>());
+        renameTrackList->updateView(renameTrackListModel.get());
+ 
+        auto* saveBtn{ modal->bindNew<Wt::WPushButton>("save-btn", Wt::WString::tr("Lms.save")) };
+        saveBtn->clicked().connect([=, this] {
+            bool success{};
+            renameTrackList->updateModel(renameTrackListModel.get());
+            if (renameTrackListModel->validate())
+            {
+                doRenameTrackList(renameTrackListModel->getName());
+                success = true;
+            }
+            renameTrackList->updateView(renameTrackListModel.get());
+            if (success)
+                LmsApp->getModalManager().dispose(modalPtr);
+        });
+
+        LmsApp->getModalManager().show(std::move(modal));
+    }
+
+    void TrackList::doRenameTrackList(const Wt::WString& name)
+    {
+        {
+            auto& session{ LmsApp->getDbSession() };
+            auto transaction{ session.createWriteTransaction() };
+            db::TrackList::pointer trackList{ db::TrackList::find(LmsApp->getDbSession(), _trackListId) };
+            if (trackList) {
+                trackList.modify()->setName(name.toUTF8());
+                bindString("name", std::string{ name.toUTF8() }, Wt::TextFormat::Plain);
+            }
+        }
+
+    }
+    
 } // namespace lms::ui
