@@ -367,7 +367,7 @@ namespace lms::db
     {
         session.checkReadTransaction();
 
-        auto query{ session.getDboSession()->query<Wt::Dbo::ptr<TrackListEntry>>(
+        auto query{ session.getDboSession()->query<int>(
             "SELECT COUNT(*) FROM tracklist_entry t_l_e WHERE t_l_e.tracklist_id = ? AND t_l_e.track_id = ?")
             .bind(_trackList)
             .bind(_track)
