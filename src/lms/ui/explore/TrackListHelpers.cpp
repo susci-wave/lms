@@ -22,6 +22,10 @@
 #include <Wt/WAnchor.h>
 #include <Wt/WImage.h>
 #include <Wt/WPushButton.h>
+#include <Wt/WComboBox.h>
+#include <Wt/WFormModel.h>
+#include <Wt/WStackedWidget.h>
+#include <Wt/WTemplateFormView.h>
 
 #include "av/IAudioFile.hpp"
 #include "core/ILogger.hpp"
@@ -43,6 +47,8 @@
 #include "ModalManager.hpp"
 #include "Utils.hpp"
 #include "common/Template.hpp"
+#include "common/MandatoryValidator.hpp"
+#include "common/ValueStringModel.hpp"
 #include "explore/PlayQueueController.hpp"
 #include "resource/ArtworkResource.hpp"
 #include "resource/DownloadResource.hpp"
