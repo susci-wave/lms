@@ -39,7 +39,7 @@ namespace lms::ui
     private:
         void refreshView();
         void addSome();
-        void renameTrackList();
+        void renameTrackList(std::string name);
         void doRenameTrackList(const Wt::WString& name);
 
         static constexpr std::size_t _batchSize{ 6 };

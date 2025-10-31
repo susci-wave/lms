@@ -116,7 +116,7 @@ namespace lms::ui
             params.setTrackList(trackListId);
             params.setFilters(filters.getDbFilters());
             params.setRange(db::Range{ 0, maxTrackCount });
-            params.setSortMethod(db::TrackSortMethod::TrackList);
+            params.setSortMethod(db::TrackSortMethod::Name);
 
             return db::Track::findIds(session, params).results;
         }

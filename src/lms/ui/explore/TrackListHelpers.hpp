@@ -60,6 +60,6 @@ namespace lms::ui::TrackListHelpers
     void showTrackInfoModal(db::TrackId trackId, Filters& filters);
     void showTrackLyricsModal(db::TrackId trackId);
     void showAddToTrackListModal(db::TrackId trackId);
-    void addToTrackList(db::TrackId trackId, db::TrackListId trackListId);
+    void addToTrackListFn(db::TrackId trackId, db::TrackListId trackListId);
     std::unique_ptr<Wt::WWidget> createEntry(const db::ObjectPtr<db::Track>& track, PlayQueueController& playQueueController, Filters& filters, std::optional<db::TrackListId>& trackListId);
 } // namespace lms::ui::TrackListHelpers

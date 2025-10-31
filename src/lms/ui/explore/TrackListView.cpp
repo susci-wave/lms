@@ -24,8 +24,10 @@
 #include <Wt/WTemplateFormView.h>
 #include <Wt/WLineEdit.h>
 #include <Wt/WFormModel.h>
+#include <Wt/Dbo/Dbo.h>
 
 #include "core/String.hpp"
+#include "core/ILogger.hpp"
 #include "database/Session.hpp"
 #include "database/objects/Cluster.hpp"
 #include "database/objects/ScanSettings.hpp"
@@ -53,10 +55,11 @@ namespace lms::ui
         public:
             static inline const Field NameField{ "name" };
 
-            RenameTrackListModel()
+            RenameTrackListModel(std::string name)
             {
                 addField(NameField);
                 setValidator(NameField, createMandatoryValidator());
+                setValue(NameField, Wt::WString::fromUTF8(name));
             }
 
             Wt::WString getName() const { return valueText(NameField); }
@@ -120,8 +123,8 @@ namespace lms::ui
         bindString("track-count", Wt::WString::trn("Lms.track-count", trackCount).arg(trackCount));
 
         Wt::WPushButton* saveBtn{ bindNew<Wt::WPushButton>("rename", Wt::WString::tr("Lms.rename"), Wt::TextFormat::Plain) };
-        saveBtn->clicked().connect([this] {
-            renameTrackList();
+        saveBtn->clicked().connect([this,trackList] {
+            renameTrackList(std::string{ trackList->getName() });
         });
 
         Wt::WContainerWidget* clusterContainers{ bindNew<Wt::WContainerWidget>("clusters") };
@@ -212,7 +215,7 @@ namespace lms::ui
         db::Track::FindParameters params;
         params.setFilters(_filters.getDbFilters());
         params.setTrackList(_trackListId);
-        params.setSortMethod(db::TrackSortMethod::TrackList);
+        params.setSortMethod(db::TrackSortMethod::Name);
         params.setRange(db::Range{ static_cast<std::size_t>(_container->getCount()), _batchSize });
 
         bool moreResults{};
@@ -225,7 +228,7 @@ namespace lms::ui
     }
 
     
-    void TrackList::renameTrackList()
+    void TrackList::renameTrackList(std::string name)
     {
         
         auto modal{ std::make_unique<Template>(Wt::WString::tr("Lms.Explore.TrackList.template.rename-tracklist")) };
@@ -242,7 +245,7 @@ namespace lms::ui
  
         // Rename TrackList
         Wt::WTemplateFormView* renameTrackList{ contentStack->addNew<Wt::WTemplateFormView>(Wt::WString::tr("Lms.Explore.TrackList.template.rename-tracklist.save")) };
-        auto renameTrackListModel{ std::make_shared<RenameTrackListModel>() };
+        auto renameTrackListModel{ std::make_shared<RenameTrackListModel>(name) };
         renameTrackList->setFormWidget(RenameTrackListModel::NameField, std::make_unique<Wt::WLineEdit>());
         renameTrackList->updateView(renameTrackListModel.get());
  
@@ -256,8 +259,11 @@ namespace lms::ui
                 success = true;
             }
             renameTrackList->updateView(renameTrackListModel.get());
-            if (success)
+            LMS_LOG(UI, ERROR, "updateView " << _trackListId.toString());
+            if (success){
                 LmsApp->getModalManager().dispose(modalPtr);
+                LMS_LOG(UI, ERROR, "dispose modalPtr " << _trackListId.toString());
+            }
         });
 
         LmsApp->getModalManager().show(std::move(modal));
@@ -265,16 +271,54 @@ namespace lms::ui
 
     void TrackList::doRenameTrackList(const Wt::WString& name)
     {
-        {
+        LMS_LOG(UI, ERROR, "coming rename " << _trackListId.toString() << ": " << name.toUTF8());
+        try {
             auto& session{ LmsApp->getDbSession() };
             auto transaction{ session.createWriteTransaction() };
-            db::TrackList::pointer trackList{ db::TrackList::find(LmsApp->getDbSession(), _trackListId) };
+            
+            /*
+            // 直接查询数据库获取version信息
+            {                
+                // 执行SQL查询获取version字段值
+                auto query = session.getDboSession()->query<int>("SELECT version FROM tracklist WHERE id = ?").bind(_trackListId);
+                try {
+                    int version = query.resultValue();
+                    LMS_LOG(UI, ERROR, "Current tracklist version for " << _trackListId.toString() << ": " << version);
+                } catch (const std::exception& e) {
+                    LMS_LOG(UI, ERROR, "Failed to get version for tracklist " << _trackListId.toString() << ": " << e.what());
+                }
+            }*/
+            
+            // 重新查找对象以确保获取最新版本
+            db::TrackList::pointer trackList{ db::TrackList::find(session, _trackListId) };
             if (trackList) {
-                trackList.modify()->setName(name.toUTF8());
+                // 使用modify()方法获取可修改的对象引用
+                auto modifiableTrackList = trackList.modify();
+                LMS_LOG(UI, ERROR, "before rename " << _trackListId.toString() << ": " << modifiableTrackList->getName());
+                // 更新名称
+                modifiableTrackList->setName(name.toUTF8());
+                // 更新UI显示
+                LMS_LOG(UI, ERROR, "before refresh " << _trackListId.toString());
                 bindString("name", std::string{ name.toUTF8() }, Wt::TextFormat::Plain);
+                LMS_LOG(UI, ERROR, "after refresh " << _trackListId.toString());
+                
+                /*
+                // 更新后再次查询version
+                try {
+                    auto query = session.getDboSession()->query<int>("SELECT version FROM tracklist WHERE id = ?").bind(_trackListId);
+                    int version = query.resultValue();
+                    LMS_LOG(UI, ERROR, "Updated tracklist version for " << _trackListId.toString() << ": " << version);
+                } catch (const std::exception& e) {
+                    LMS_LOG(UI, ERROR, "Failed to get updated version for tracklist " << _trackListId.toString() << ": " << e.what());
+                }
+                    */
             }
         }
-
+        catch (const Wt::Dbo::StaleObjectException& e) {
+            // 捕获乐观锁定异常，记录日志并尝试刷新UI
+            LMS_LOG(UI, ERROR, "Stale object exception when renaming tracklist " << _trackListId.toString() << ": " << e.what());
+        }
+        LMS_LOG(UI, ERROR, "rename done " << _trackListId.toString());
     }
     
 } // namespace lms::ui

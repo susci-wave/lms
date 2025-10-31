@@ -376,13 +376,13 @@ namespace lms::ui::TrackListHelpers
                 if (trackListId.has_value()) {
                     LMS_LOG(UI, INFO, "Delete button confirmed for track " << trackId.toString() << " from track list " << trackListId->toString());
                     
-                    // 实际删除逻辑
-                    auto transaction{ LmsApp->getDbSession().createWriteTransaction() };
+                    db::Session& session{ LmsApp->getDbSession() };
+                    auto transaction{ session.createWriteTransaction() };
                     
                     try {
                         // 查找并删除 TrackListEntry
                         std::vector<db::TrackListEntry::pointer> entriesToDelete;
-                        db::TrackListEntry::find(LmsApp->getDbSession(), 
+                        db::TrackListEntry::find(session, 
                             db::TrackListEntry::FindParameters{}.setTrackList(*trackListId),
                             [trackId, &entriesToDelete](const db::TrackListEntry::pointer& entry) {
                                 if (entry->getTrackId() == trackId) {
@@ -398,14 +398,6 @@ namespace lms::ui::TrackListHelpers
                         }
                         
                         if (!entriesToDelete.empty()) {
-                            // 更新 TrackList 的最后修改时间
-                            auto trackList{ db::TrackList::find(LmsApp->getDbSession(), *trackListId) };
-                            if (trackList) {
-                                trackList.modify()->setLastModifiedDateTime(Wt::WDateTime::currentDateTime());
-                                LMS_LOG(UI, INFO, "Updated last modified time for track list " << trackListId->toString());
-                            }
-                            
-                            // 标识数据已被删除 - 从UI中移除该条目
                             LMS_LOG(UI, INFO, "Removing track entry from UI for track " << trackId.toString());
                             entryPtr->removeFromParent();
                         }
@@ -475,26 +467,26 @@ namespace lms::ui::TrackListHelpers
 
         Wt::WStackedWidget* contentStack{ modal->bindNew<Wt::WStackedWidget>("contents") };
         
-        // Replace TrackList
-        Wt::WTemplateFormView* replaceTrackList{ contentStack->addNew<Wt::WTemplateFormView>(Wt::WString::tr("Lms.PlayQueue.template.save-as-tracklist.replace-tracklist")) };
-        auto replaceTrackListModel{ std::make_shared<AddToTrackListModel>() };
+        // Add TrackList
+        Wt::WTemplateFormView* addToTrackList{ contentStack->addNew<Wt::WTemplateFormView>(Wt::WString::tr("Lms.PlayQueue.template.save-as-tracklist.replace-tracklist")) };
+        auto addToTrackListModel{ std::make_shared<AddToTrackListModel>() };
         {
             auto name{ std::make_unique<Wt::WComboBox>() };
-            name->setModel(replaceTrackListModel->trackListModel);
-            replaceTrackList->setFormWidget(AddToTrackListModel::NameField, std::move(name));
+            name->setModel(addToTrackListModel->trackListModel);
+            addToTrackList->setFormWidget(AddToTrackListModel::NameField, std::move(name));
         }
-        replaceTrackList->updateView(replaceTrackListModel.get());
+        addToTrackList->updateView(addToTrackListModel.get());
  
         auto* saveBtn{ modal->bindNew<Wt::WPushButton>("save-btn", Wt::WString::tr("Lms.save")) };
         saveBtn->clicked().connect([=, modalPtr = modal.get()] {
                 bool success{};
-                replaceTrackList->updateModel(replaceTrackListModel.get());
-                if (replaceTrackListModel->validate())
+                addToTrackList->updateModel(addToTrackListModel.get());
+                if (addToTrackListModel->validate())
                 {
-                    addToTrackList(trackId, replaceTrackListModel->getTrackListId());
+                    addToTrackListFn(trackId, addToTrackListModel->getTrackListId());
                     success = true;
                 }
-                replaceTrackList->updateView(replaceTrackListModel.get());
+                addToTrackList->updateView(addToTrackListModel.get());
 
             if (success)
                 LmsApp->getModalManager().dispose(modalPtr);
@@ -503,7 +495,7 @@ namespace lms::ui::TrackListHelpers
         LmsApp->getModalManager().show(std::move(modal));
     }
 
-    void addToTrackList(db::TrackId trackId, db::TrackListId trackListId)
+    void addToTrackListFn(db::TrackId trackId, db::TrackListId trackListId)
     {
         // 创建数据库事务
         auto transaction{ LmsApp->getDbSession().createWriteTransaction() };
