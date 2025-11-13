@@ -22,8 +22,13 @@
 #include <Wt/WAnchor.h>
 #include <Wt/WImage.h>
 #include <Wt/WPushButton.h>
+#include <Wt/WComboBox.h>
+#include <Wt/WFormModel.h>
+#include <Wt/WStackedWidget.h>
+#include <Wt/WTemplateFormView.h>
 
 #include "av/IAudioFile.hpp"
+#include "core/ILogger.hpp"
 #include "core/Service.hpp"
 #include "database/Session.hpp"
 #include "database/Types.hpp"
@@ -31,6 +36,7 @@
 #include "database/objects/Release.hpp"
 #include "database/objects/Track.hpp"
 #include "database/objects/TrackArtistLink.hpp"
+#include "database/objects/TrackList.hpp"
 #include "database/objects/TrackLyrics.hpp"
 #include "database/objects/User.hpp"
 #include "services/feedback/IFeedbackService.hpp"
@@ -41,6 +47,8 @@
 #include "ModalManager.hpp"
 #include "Utils.hpp"
 #include "common/Template.hpp"
+#include "common/MandatoryValidator.hpp"
+#include "common/ValueStringModel.hpp"
 #include "explore/PlayQueueController.hpp"
 #include "resource/ArtworkResource.hpp"
 #include "resource/DownloadResource.hpp"
@@ -210,7 +218,7 @@ namespace lms::ui::TrackListHelpers
         LmsApp->getModalManager().show(std::move(trackLyrics));
     }
 
-    std::unique_ptr<Wt::WWidget> createEntry(const db::ObjectPtr<db::Track>& track, PlayQueueController& playQueueController, Filters& filters)
+    std::unique_ptr<Wt::WWidget> createEntry(const db::ObjectPtr<db::Track>& track, PlayQueueController& playQueueController, Filters& filters, std::optional<db::TrackListId>& trackListId)
     {
         auto entry{ std::make_unique<Template>(Wt::WString::tr("Lms.Explore.Tracks.template.entry")) };
         auto* entryPtr{ entry.get() };
@@ -306,6 +314,53 @@ namespace lms::ui::TrackListHelpers
         entry->bindNew<Wt::WPushButton>("download", Wt::WString::tr("Lms.Explore.download"))
             ->setLink(Wt::WLink{ std::make_unique<DownloadTrackResource>(trackId) });
 
+        entry->setCondition("if-has-tracklistid", trackListId.has_value());
+        Wt::WPushButton* delBtn{ entry->bindNew<Wt::WPushButton>("delete", Wt::WString::tr("Lms.delete")) };
+        delBtn->clicked().connect([trackId, trackListId, entryPtr] {
+            auto modal{ std::make_unique<Wt::WTemplate>(Wt::WString::tr("Lms.Explore.TrackList.template.delete-tracklist")) };
+            modal->addFunction("tr", &Wt::WTemplate::Functions::tr);
+            Wt::WWidget* modalPtr{ modal.get() };
+
+            auto* delBtn2{ modal->bindNew<Wt::WPushButton>("del-btn", Wt::WString::tr("Lms.delete")) };
+            delBtn2->clicked().connect([trackId, trackListId, modalPtr, entryPtr] {
+                if (trackListId.has_value()) {
+                    db::Session& session{ LmsApp->getDbSession() };
+                    auto transaction{ session.createWriteTransaction() };
+                    
+                    try {
+                        std::vector<db::TrackListEntry::pointer> entriesToDelete;
+                        db::TrackListEntry::find(session, 
+                            db::TrackListEntry::FindParameters{}.setTrackList(*trackListId),
+                            [trackId, &entriesToDelete](const db::TrackListEntry::pointer& entry) {
+                                if (entry->getTrackId() == trackId) {
+                                    entriesToDelete.push_back(entry);
+                                }
+                            });
+                        
+                        for (auto& entry : entriesToDelete) {
+                            entry.remove();
+                        }
+                        
+                        if (!entriesToDelete.empty()) {
+                            entryPtr->removeFromParent();
+                        }
+                        
+                    } catch (const std::exception& e) {
+                        LMS_LOG(UI, ERROR, "Failed to delete track " << trackId.toString() << " from track list: " << e.what());
+                    }
+                }
+            
+                LmsApp->getModalManager().dispose(modalPtr);
+            });
+
+            auto* cancelBtn{ modal->bindNew<Wt::WPushButton>("cancel-btn", Wt::WString::tr("Lms.cancel")) };
+            cancelBtn->clicked().connect([=] {
+                LmsApp->getModalManager().dispose(modalPtr);
+            });
+
+            LmsApp->getModalManager().show(std::move(modal));
+
+        });
         entry->bindNew<Wt::WPushButton>("track-info", Wt::WString::tr("Lms.Explore.track-info"))
             ->clicked()
             .connect([trackId, &filters] { showTrackInfoModal(trackId, filters); });

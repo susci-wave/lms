@@ -387,7 +387,8 @@ namespace lms::ui
             if (_trackContainer->getCount() == _tracksMaxCount)
                 break;
 
-            _trackContainer->add(TrackListHelpers::createEntry(track, _playQueueController, _filters));
+            std::optional<db::TrackListId> _nullopt = std::nullopt;
+            _trackContainer->add(TrackListHelpers::createEntry(track, _playQueueController, _filters, _nullopt));
 
             areTracksAdded = true;
         }

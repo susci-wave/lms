@@ -58,5 +58,5 @@ namespace lms::ui::TrackListHelpers
     std::map<Wt::WString, std::set<db::ArtistId>> getArtistsByRole(db::TrackId trackId, core::EnumSet<db::TrackArtistLinkType> artistLinkTypes = AllArtistRoles);
     void showTrackInfoModal(db::TrackId trackId, Filters& filters);
     void showTrackLyricsModal(db::TrackId trackId);
-    std::unique_ptr<Wt::WWidget> createEntry(const db::ObjectPtr<db::Track>& track, PlayQueueController& playQueueController, Filters& filters);
+    std::unique_ptr<Wt::WWidget> createEntry(const db::ObjectPtr<db::Track>& track, PlayQueueController& playQueueController, Filters& filters, std::optional<db::TrackListId>& trackListId);
 } // namespace lms::ui::TrackListHelpers
