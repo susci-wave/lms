@@ -122,6 +122,11 @@ namespace lms::ui
         const auto trackCount{ trackList->getCount() };
         bindString("track-count", Wt::WString::trn("Lms.track-count", trackCount).arg(trackCount));
 
+        Wt::WPushButton* viewTracksNameBtn{ bindNew<Wt::WPushButton>("view-tracks-name", Wt::WString::tr("Lms.tracks-name"), Wt::TextFormat::Plain) };
+        viewTracksNameBtn->clicked().connect([this] {   
+            viewTracksName();
+        });
+
         Wt::WPushButton* saveBtn{ bindNew<Wt::WPushButton>("rename", Wt::WString::tr("Lms.rename"), Wt::TextFormat::Plain) };
         saveBtn->clicked().connect([this] {
             openRenameTrackListDialog();
@@ -278,4 +283,37 @@ namespace lms::ui
             bindString("name", std::string{ name.toUTF8() }, Wt::TextFormat::Plain);
         }
     }
+    void TrackList::viewTracksName(){
+        auto transaction{ LmsApp->getDbSession().createReadTransaction() };
+
+        const db::TrackList::pointer trackList{ db::TrackList::find(LmsApp->getDbSession(), _trackListId) };
+        if(trackList->getCount() == 0){
+            return;
+        }
+        db::Track::FindParameters params;
+        params.setFilters(_filters.getDbFilters());
+        params.setTrackList(_trackListId);
+        params.setSortMethod(db::TrackSortMethod::Name);
+        params.setRange(db::Range{ 0, static_cast<std::size_t>(trackList->getCount()) });
+
+        bool moreResults{};
+        std::string trackNames;
+        db::Track::find(LmsApp->getDbSession(), params, moreResults, [this,&trackNames](const db::Track::pointer& track) {
+            trackNames += track->getName() + "\r";
+        });
+        
+        auto modal{ std::make_unique<Template>(Wt::WString::tr("Lms.Explore.TrackList.template.view-tracks-name")) };
+        modal->addFunction("id", &Wt::WTemplate::Functions::id);
+        modal->addFunction("tr", &Wt::WTemplate::Functions::tr);
+        Wt::WWidget* modalPtr{ modal.get() };
+
+        auto* cancelBtn{ modal->bindNew<Wt::WPushButton>("cancel-btn", Wt::WString::tr("Lms.cancel")) };
+        cancelBtn->clicked().connect([=] {
+            LmsApp->getModalManager().dispose(modalPtr);
+        });
+        modal->bindString("contents", trackNames, Wt::TextFormat::Plain);
+  
+        LmsApp->getModalManager().show(std::move(modal));
+    }
+    
 } // namespace lms::ui

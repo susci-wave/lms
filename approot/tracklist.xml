@@ -15,6 +15,7 @@
 				<li>${play-last class="dropdown-item"}</li>
 				<li>${download class="dropdown-item"}</li>
 				<li>${rename class="dropdown-item"}</li>
+				<li>${view-tracks-name class="dropdown-item"}</li>
 				${<if-has-delete>}
 				<li>${delete class="dropdown-item"}</li>
 				${</if-has-delete>}
@@ -75,4 +76,19 @@
 	</div>
 </message>
 
+<message id="Lms.Explore.TrackList.template.view-tracks-name">
+	<div class="modal fade" tabindex="-1">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h5 class="modal-title">${tr:Lms.tracks-name}</h5>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+				</div>
+				<div class="modal-body">
+					<textarea style="width:100%;" rows="10">${contents}</textarea>
+				</div>
+			</div>
+		</div>
+	</div>
+</message>
 </messages>
