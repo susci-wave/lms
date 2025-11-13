@@ -31,6 +31,7 @@
 #include "database/Types.hpp"
 #include "database/objects/ArtistId.hpp"
 #include "database/objects/TrackId.hpp"
+#include "database/objects/TrackListId.hpp"
 
 namespace lms::db
 {
@@ -58,5 +59,7 @@ namespace lms::ui::TrackListHelpers
     std::map<Wt::WString, std::set<db::ArtistId>> getArtistsByRole(db::TrackId trackId, core::EnumSet<db::TrackArtistLinkType> artistLinkTypes = AllArtistRoles);
     void showTrackInfoModal(db::TrackId trackId, Filters& filters);
     void showTrackLyricsModal(db::TrackId trackId);
+    void showAddToTrackListModal(db::TrackId trackId);
+    void addToTrackList(db::TrackId trackId, db::TrackListId trackListId);
     std::unique_ptr<Wt::WWidget> createEntry(const db::ObjectPtr<db::Track>& track, PlayQueueController& playQueueController, Filters& filters, std::optional<db::TrackListId>& trackListId);
 } // namespace lms::ui::TrackListHelpers

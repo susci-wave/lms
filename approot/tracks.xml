@@ -61,6 +61,7 @@
 					<li>${star class="dropdown-item"}</li>
 					<li>${download class="dropdown-item"}</li>
 					<li>${track-info class="dropdown-item"}</li>
+					<li>${add-to-tracklist class="dropdown-item"}</li>
 					${<if-has-lyrics>}<li>${track-lyrics class="dropdown-item"}</li>${</if-has-lyrics>}
 					${<if-has-tracklistid>}<li>${delete class="dropdown-item"}</li>${</if-has-tracklistid>}
 				</ul>
@@ -159,6 +160,34 @@
 				</div>
 			</div>
 		</div>
+	</div>
+</message>
+
+<message id="Lms.Explore.Tracks.template.add-to-tracklist">
+	<div class="modal fade" tabindex="-1">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h5 class="modal-title">${tr:Lms.add-to-tracklist}</h5>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+				</div>
+				<div class="modal-body">
+					<form>
+						${contents}
+					</form>
+				</div>
+				<div class="modal-footer">
+					${save-btn class="btn btn-primary me-1"}${cancel-btn class="btn btn-secondary"}
+				</div>
+			</div>
+		</div>
+	</div>
+</message>
+
+<message id="Lms.Explore.Tracks.template.add-to-tracklist.save">
+	${name class="form-control"}
+	<div class="invalid-feedback">
+		${name-info}
 	</div>
 </message>
 

@@ -9,6 +9,7 @@
 <message id="Lms.clusters">Tags</message>
 <message id="Lms.create">Créer</message>
 <message id="Lms.delete">Supprimer</message>
+<message id="Lms.add-to-tracklist">Ajouter à la liste de lecture</message>
 <message id="Lms.rename">Renommer</message>
 <message id="Lms.discard">Annuler</message>
 <message id="Lms.edit">Editer</message>

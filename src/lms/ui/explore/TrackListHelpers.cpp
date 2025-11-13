@@ -55,6 +55,50 @@
 
 namespace lms::ui::TrackListHelpers
 {
+    namespace {
+        
+        class AddToTrackListModel : public Wt::WFormModel
+        {
+        public:
+            static inline const Field NameField{ "name" };
+            using TrackListModel = ValueStringModel<db::TrackListId>;
+
+            AddToTrackListModel()
+            {
+                addField(NameField);
+                setValidator(NameField, createMandatoryValidator());
+            }
+
+            db::TrackListId getTrackListId() const
+            {
+                auto row{ trackListModel->getRowFromString(valueText(NameField)) };
+                return trackListModel->getValue(*row);
+            }
+
+            static std::shared_ptr<TrackListModel> createTrackListModel()
+            {
+                using namespace db;
+
+                auto model{ std::make_shared<TrackListModel>() };
+
+                auto transaction{ LmsApp->getDbSession().createReadTransaction() };
+
+                TrackList::FindParameters params;
+                params.setType(TrackListType::PlayList);
+                params.setUser(LmsApp->getUserId());
+                params.setSortMethod(TrackListSortMethod::Name);
+
+                TrackList::find(LmsApp->getDbSession(), params, [&](const TrackList::pointer& trackList) {
+                    model->add(Wt::WString::fromUTF8(std::string{ trackList->getName() }), trackList->getId());
+                });
+
+                return model;
+            }
+
+            std::shared_ptr<TrackListModel> trackListModel{ createTrackListModel() };
+        };
+    } // namespace
+
     std::map<Wt::WString, std::set<db::ArtistId>> getArtistsByRole(db::TrackId trackId, core::EnumSet<db::TrackArtistLinkType> artistLinkTypes)
     {
         std::map<Wt::WString, std::set<db::ArtistId>> artistMap;
@@ -361,6 +405,12 @@ namespace lms::ui::TrackListHelpers
             LmsApp->getModalManager().show(std::move(modal));
 
         });
+        
+        Wt::WPushButton* addToTrackListBtn{ entry->bindNew<Wt::WPushButton>("add-to-tracklist", Wt::WString::tr("Lms.add-to-tracklist")) };
+        addToTrackListBtn->clicked().connect([trackId] {
+            showAddToTrackListModal(trackId);
+        });
+
         entry->bindNew<Wt::WPushButton>("track-info", Wt::WString::tr("Lms.Explore.track-info"))
             ->clicked()
             .connect([trackId, &filters] { showTrackInfoModal(trackId, filters); });
@@ -387,4 +437,66 @@ namespace lms::ui::TrackListHelpers
         return entry;
     }
 
+    void showAddToTrackListModal(db::TrackId trackId)
+    {
+        auto modal{ std::make_unique<Wt::WTemplate>(Wt::WString::tr("Lms.Explore.Tracks.template.add-to-tracklist")) };
+        modal->addFunction("id", &Wt::WTemplate::Functions::id);
+        modal->addFunction("tr", &Wt::WTemplate::Functions::tr);
+        Wt::WWidget* modalPtr{ modal.get() };
+
+        auto* cancelBtn{ modal->bindNew<Wt::WPushButton>("cancel-btn", Wt::WString::tr("Lms.cancel")) };
+        cancelBtn->clicked().connect([=] {
+            LmsApp->getModalManager().dispose(modalPtr);
+        });
+
+        Wt::WStackedWidget* contentStack{ modal->bindNew<Wt::WStackedWidget>("contents") };
+        
+        Wt::WTemplateFormView* addToTrackListView{ contentStack->addNew<Wt::WTemplateFormView>(Wt::WString::tr("Lms.PlayQueue.template.save-as-tracklist.replace-tracklist")) };
+        auto addToTrackListModel{ std::make_shared<AddToTrackListModel>() };
+        {
+            auto name{ std::make_unique<Wt::WComboBox>() };
+            name->setModel(addToTrackListModel->trackListModel);
+            addToTrackListView->setFormWidget(AddToTrackListModel::NameField, std::move(name));
+        }
+        addToTrackListView->updateView(addToTrackListModel.get());
+ 
+        auto* saveBtn{ modal->bindNew<Wt::WPushButton>("save-btn", Wt::WString::tr("Lms.save")) };
+        saveBtn->clicked().connect([=, modalPtr = modal.get()] {
+                bool success{};
+                addToTrackListView->updateModel(addToTrackListModel.get());
+                if (addToTrackListModel->validate())
+                {
+                    addToTrackList(trackId, addToTrackListModel->getTrackListId());
+                    success = true;
+                }
+                addToTrackListView->updateView(addToTrackListModel.get());
+
+            if (success)
+                LmsApp->getModalManager().dispose(modalPtr);
+        });
+
+        LmsApp->getModalManager().show(std::move(modal));
+    }
+
+    void addToTrackList(db::TrackId trackId, db::TrackListId trackListId)
+    {
+        auto transaction{ LmsApp->getDbSession().createWriteTransaction() };
+        
+        db::TrackList::pointer trackList{ db::TrackList::find(LmsApp->getDbSession(), trackListId) };
+        if (!trackList) {
+            return;
+        }
+        
+        db::Track::pointer track{ db::Track::find(LmsApp->getDbSession(), trackId) };
+        if (!track) {
+            return;
+        }
+        
+        std::size_t trackExists{ db::TrackListEntry::isTrackInList(LmsApp->getDbSession(), trackId, trackListId) };
+        if( trackExists == 1){
+            return;
+        }
+        
+        LmsApp->getDbSession().create<db::TrackListEntry>(track, trackList);
+    }
 } // namespace lms::ui::TrackListHelpers

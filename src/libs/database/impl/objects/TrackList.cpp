@@ -349,6 +349,18 @@ namespace lms::db
 
         return utils::fetchQuerySingleResult(session.getDboSession()->find<TrackListEntry>().where("id = ?").bind(id));
     }
+    std::size_t TrackListEntry::isTrackInList(Session& session, TrackId _track, TrackListId _trackList)
+    {
+        session.checkReadTransaction();
+
+        auto query{ session.getDboSession()->query<int>(
+            "SELECT COUNT(*) FROM tracklist_entry t_l_e WHERE t_l_e.tracklist_id = ? AND t_l_e.track_id = ?")
+            .bind(_trackList)
+            .bind(_track)
+        };
+        std::size_t cnt = utils::fetchQuerySingleResult(query);
+        return cnt == 0 ? 0 : 1;
+    }
 
     void TrackListEntry::find(Session& session, const FindParameters& params, const std::function<void(const TrackListEntry::pointer&)>& func)
     {
