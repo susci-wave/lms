@@ -9,6 +9,7 @@
 <message id="Lms.clusters">Znaczniki</message>
 <message id="Lms.create">Utwórz</message>
 <message id="Lms.delete">Usuń</message>
+<message id="Lms.rename">Zmień</message>
 <message id="Lms.discard">Odrzuć</message>
 <message id="Lms.edit">Zmień</message>
 <message id="Lms.field-must-be-in-upper-case">Wartość musi się zaczynać wielką literą</message>
